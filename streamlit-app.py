@@ -1,33 +1,14 @@
 import streamlit as st
+
+# Set page config must be the first Streamlit command
+st.set_page_config(page_title="Data Analysis Dashboard", layout="wide")
+
+# Import other libraries
 import pandas as pd
 import numpy as np
 import random
 
-# Install plotly
-import subprocess
-import sys
-
-# Try to install plotly
-st.write("Installing required packages...")
-try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
-    st.success("Plotly installed successfully!")
-except Exception as e:
-    st.error(f"Failed to install Plotly: {e}")
-    st.warning("Continuing with limited functionality...")
-
-# Now try to import plotly
-try:
-    import plotly.express as px
-    import plotly.graph_objects as go
-    PLOTLY_AVAILABLE = True
-    st.success("Plotly imported successfully!")
-except ImportError:
-    PLOTLY_AVAILABLE = False
-    st.error("Plotly could not be imported. Using alternative visualizations.")
-
-# Page configuration
-st.set_page_config(page_title="Data Analysis Dashboard", layout="wide")
+# Create a basic Streamlit app without external dependencies
 st.title("Interactive Data Analysis Dashboard")
 st.write("Explore customer data with interactive filters")
 
@@ -84,51 +65,32 @@ st.write(f"Showing data for ages {age_range[0]}-{age_range[1]}, " +
          f"City: {selected_city}, Product Category: {product_category}")
 st.write(f"Filtered data contains {len(filtered_df)} records")
 
-# Create visualizations based on plotly availability
+# Create visualizations using Streamlit's built-in chart functions
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Age Distribution")
-    if PLOTLY_AVAILABLE:
-        fig_age = px.histogram(filtered_df, x='Age', 
-                              title='Age Distribution',
-                              color_discrete_sequence=['#3366CC'])
-        st.plotly_chart(fig_age, use_container_width=True)
-    else:
-        # Fallback to basic chart using Streamlit
-        st.bar_chart(filtered_df['Age'].value_counts().sort_index())
+    # Calculate histogram data manually
+    age_counts = filtered_df['Age'].value_counts().sort_index().reset_index()
+    age_counts.columns = ['Age', 'Count']
+    st.bar_chart(age_counts.set_index('Age'))
 
     st.subheader("City Distribution")
     city_counts = filtered_df['City'].value_counts().reset_index()
     city_counts.columns = ['City', 'Count']
-    if PLOTLY_AVAILABLE:
-        fig_city = px.bar(city_counts, x='City', y='Count', 
-                         title='City Distribution')
-        st.plotly_chart(fig_city, use_container_width=True)
-    else:
-        # Fallback to table
-        st.table(city_counts)
+    st.bar_chart(city_counts.set_index('City'))
 
 with col2:
     st.subheader("Income vs. Purchase Amount")
-    if PLOTLY_AVAILABLE:
-        fig_income_purchase = px.scatter(filtered_df, x='Income', y='PurchaseAmount', 
-                                        color='City', 
-                                        title='Income vs. Purchase Amount')
-        st.plotly_chart(fig_income_purchase, use_container_width=True)
-    else:
-        # Fallback to basic scatter chart
-        st.scatter_chart(filtered_df, x='Income', y='PurchaseAmount')
+    chart_data = filtered_df[['Income', 'PurchaseAmount']]
+    st.scatter_chart(chart_data, x='Income', y='PurchaseAmount')
 
     st.subheader("Purchase Amount by Product Category")
-    if PLOTLY_AVAILABLE:
-        fig_purchase_category = px.box(filtered_df, x='ProductCategory', y='PurchaseAmount', 
-                                      title='Purchase Amount by Product Category')
-        st.plotly_chart(fig_purchase_category, use_container_width=True)
-    else:
-        # Group by product category
-        product_stats = filtered_df.groupby('ProductCategory')['PurchaseAmount'].agg(['mean', 'median', 'min', 'max']).reset_index()
-        st.table(product_stats)
+    # Calculate stats for each product category
+    product_stats = filtered_df.groupby('ProductCategory')['PurchaseAmount'].agg(['mean', 'median', 'min', 'max']).reset_index()
+    for col in product_stats.columns[1:]:
+        product_stats[col] = product_stats[col].round(2)
+    st.dataframe(product_stats)
 
 # Add statistics section
 st.header("Data Statistics")
@@ -149,17 +111,8 @@ with col5:
 # Add correlation heatmap
 st.header("Correlation Analysis")
 numeric_df = filtered_df.select_dtypes(include=['float64', 'int64'])
-corr = numeric_df.corr()
-
-if PLOTLY_AVAILABLE:
-    fig_corr = px.imshow(corr, 
-                        text_auto=True, 
-                        color_continuous_scale='RdBu_r',
-                        title="Correlation Heatmap")
-    st.plotly_chart(fig_corr, use_container_width=True)
-else:
-    # Fallback to table
-    st.table(corr.round(2))
+corr = numeric_df.corr().round(2)
+st.dataframe(corr)
 
 # Add purchase trends over age groups
 st.header("Purchase Trends by Age Group")
@@ -171,18 +124,44 @@ filtered_df['AgeGroup'] = pd.cut(filtered_df['Age'],
 # Group by age group and product category
 age_product_data = filtered_df.groupby(['AgeGroup', 'ProductCategory'])['PurchaseAmount'].mean().reset_index()
 
-if PLOTLY_AVAILABLE:
-    fig_trends = px.bar(age_product_data, 
-                       x='AgeGroup', 
-                       y='PurchaseAmount', 
-                       color='ProductCategory',
-                       barmode='group',
-                       title='Average Purchase Amount by Age Group and Product Category')
-    st.plotly_chart(fig_trends, use_container_width=True)
-else:
-    # Pivot the data for easier reading
-    pivot_data = age_product_data.pivot(index='AgeGroup', columns='ProductCategory', values='PurchaseAmount')
-    st.table(pivot_data.round(2))
+# Pivot the data for easier reading
+pivot_data = age_product_data.pivot(index='AgeGroup', columns='ProductCategory', values='PurchaseAmount').reset_index()
+st.dataframe(pivot_data.round(2))
+
+# Additional user engagement
+st.header("Explore Your Data")
+exploration_tab1, exploration_tab2 = st.tabs(["Data by City", "Data by Product"])
+
+with exploration_tab1:
+    selected_city_explore = st.selectbox("Select a city to explore:", filtered_df['City'].unique())
+    city_data = filtered_df[filtered_df['City'] == selected_city_explore]
+    
+    st.subheader(f"Summary Statistics for {selected_city_explore}")
+    st.write(f"Number of customers: {len(city_data)}")
+    st.write(f"Average age: {city_data['Age'].mean():.1f}")
+    st.write(f"Average purchase: ${city_data['PurchaseAmount'].mean():.2f}")
+    st.write(f"Average income: ${city_data['Income'].mean():.2f}")
+    
+    # Product distribution for selected city
+    st.subheader(f"Product Categories in {selected_city_explore}")
+    product_dist = city_data['ProductCategory'].value_counts().reset_index()
+    product_dist.columns = ['Product Category', 'Count']
+    st.bar_chart(product_dist.set_index('Product Category'))
+
+with exploration_tab2:
+    selected_product = st.selectbox("Select a product category to explore:", filtered_df['ProductCategory'].unique())
+    product_data = filtered_df[filtered_df['ProductCategory'] == selected_product]
+    
+    st.subheader(f"Summary Statistics for {selected_product}")
+    st.write(f"Number of purchases: {len(product_data)}")
+    st.write(f"Average purchase amount: ${product_data['PurchaseAmount'].mean():.2f}")
+    st.write(f"Highest purchase amount: ${product_data['PurchaseAmount'].max():.2f}")
+    
+    # City distribution for selected product
+    st.subheader(f"City Distribution for {selected_product}")
+    city_dist = product_data['City'].value_counts().reset_index()
+    city_dist.columns = ['City', 'Count']
+    st.bar_chart(city_dist.set_index('City'))
 
 # Add footer
 st.markdown("---")
