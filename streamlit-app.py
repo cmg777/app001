@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import random
 
 # Page configuration
@@ -47,9 +49,6 @@ selected_city = st.sidebar.selectbox("Select City:", city_options)
 product_options = ["All", "Electronics", "Clothing", "Books", "Home", "Food"]
 product_category = st.sidebar.selectbox("Select Product Category:", product_options)
 
-# Number of rows to display
-num_rows = st.sidebar.slider("Number of rows to display", 5, 50, 20)
-
 # Apply filters
 filtered_df = df[(df['Age'] >= age_range[0]) & (df['Age'] <= age_range[1])]
 
@@ -64,89 +63,131 @@ st.write(f"Showing data for ages {age_range[0]}-{age_range[1]}, " +
          f"City: {selected_city}, Product Category: {product_category}")
 st.write(f"Filtered data contains {len(filtered_df)} records")
 
-# Display filtered data
-st.subheader("Filtered Data")
-st.dataframe(filtered_df.head(num_rows))
-
-# Data statistics
-st.header("Data Statistics")
+# Create visualizations in a 2x2 grid
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Age Statistics")
-    age_stats = pd.DataFrame({
-        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation'],
-        'Value': [
-            f"{filtered_df['Age'].mean():.2f}",
-            f"{filtered_df['Age'].median():.2f}",
-            f"{filtered_df['Age'].min():.2f}",
-            f"{filtered_df['Age'].max():.2f}",
-            f"{filtered_df['Age'].std():.2f}"
-        ]
-    })
-    st.table(age_stats)
-    
-    st.subheader("Purchase Amount Statistics")
-    purchase_stats = pd.DataFrame({
-        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation', 'Total'],
-        'Value': [
-            f"${filtered_df['PurchaseAmount'].mean():.2f}",
-            f"${filtered_df['PurchaseAmount'].median():.2f}",
-            f"${filtered_df['PurchaseAmount'].min():.2f}",
-            f"${filtered_df['PurchaseAmount'].max():.2f}",
-            f"${filtered_df['PurchaseAmount'].std():.2f}",
-            f"${filtered_df['PurchaseAmount'].sum():.2f}"
-        ]
-    })
-    st.table(purchase_stats)
+    # Age Distribution
+    st.subheader("Age Distribution")
+    fig_age = px.histogram(filtered_df, x='Age', 
+                          title='Age Distribution',
+                          color_discrete_sequence=['#3366CC'])
+    fig_age.update_layout(
+        xaxis_title="Age",
+        yaxis_title="Count",
+        hovermode="closest"
+    )
+    st.plotly_chart(fig_age, use_container_width=True)
 
-with col2:
-    st.subheader("Income Statistics")
-    income_stats = pd.DataFrame({
-        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation'],
-        'Value': [
-            f"${filtered_df['Income'].mean():.2f}",
-            f"${filtered_df['Income'].median():.2f}",
-            f"${filtered_df['Income'].min():.2f}",
-            f"${filtered_df['Income'].max():.2f}",
-            f"${filtered_df['Income'].std():.2f}"
-        ]
-    })
-    st.table(income_stats)
-    
-    # City distribution
+    # City Distribution
     st.subheader("City Distribution")
     city_counts = filtered_df['City'].value_counts().reset_index()
     city_counts.columns = ['City', 'Count']
-    st.table(city_counts)
+    fig_city = px.bar(city_counts, x='City', y='Count', 
+                     title='City Distribution',
+                     color='City',
+                     color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig_city.update_layout(
+        xaxis_title="City",
+        yaxis_title="Count",
+        hovermode="closest"
+    )
+    st.plotly_chart(fig_city, use_container_width=True)
 
-# Group data by product category
-st.header("Product Category Analysis")
-product_analysis = filtered_df.groupby('ProductCategory').agg({
-    'PurchaseAmount': ['mean', 'median', 'min', 'max', 'sum', 'count']
-}).reset_index()
+with col2:
+    # Income vs. Purchase Amount
+    st.subheader("Income vs. Purchase Amount")
+    fig_income_purchase = px.scatter(filtered_df, x='Income', y='PurchaseAmount', 
+                                    color='City', 
+                                    title='Income vs. Purchase Amount',
+                                    opacity=0.7,
+                                    size_max=10,
+                                    color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig_income_purchase.update_layout(
+        xaxis_title="Income ($)",
+        yaxis_title="Purchase Amount ($)",
+        hovermode="closest"
+    )
+    st.plotly_chart(fig_income_purchase, use_container_width=True)
 
-# Flatten the multi-level columns
-product_analysis.columns = ['ProductCategory', 'Mean Purchase', 'Median Purchase', 
-                           'Min Purchase', 'Max Purchase', 'Total Revenue', 'Transaction Count']
+    # Purchase Amount by Product Category (Box Plot)
+    st.subheader("Purchase Amount by Product Category")
+    fig_purchase_category = px.box(filtered_df, x='ProductCategory', y='PurchaseAmount', 
+                                  title='Purchase Amount by Product Category',
+                                  color='ProductCategory',
+                                  color_discrete_sequence=px.colors.qualitative.Bold)
+    fig_purchase_category.update_layout(
+        xaxis_title="Product Category",
+        yaxis_title="Purchase Amount ($)",
+        hovermode="closest"
+    )
+    st.plotly_chart(fig_purchase_category, use_container_width=True)
 
-# Format currency columns
-for col in product_analysis.columns[1:6]:
-    product_analysis[col] = product_analysis[col].apply(lambda x: f"${x:.2f}")
+# Add statistics section
+st.header("Data Statistics")
+col3, col4, col5 = st.columns(3)
 
-st.dataframe(product_analysis)
+with col3:
+    st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
+    st.metric("Average Income", f"${filtered_df['Income'].mean():.2f}")
 
-# Correlation Analysis
+with col4:
+    st.metric("Average Purchase", f"${filtered_df['PurchaseAmount'].mean():.2f}")
+    st.metric("Total Purchases", f"${filtered_df['PurchaseAmount'].sum():.2f}")
+
+with col5:
+    st.metric("Highest Purchase", f"${filtered_df['PurchaseAmount'].max():.2f}")
+    st.metric("Most Common City", filtered_df['City'].value_counts().index[0] if not filtered_df.empty else "N/A")
+
+# Add correlation heatmap
 st.header("Correlation Analysis")
 numeric_df = filtered_df.select_dtypes(include=['float64', 'int64'])
-corr = numeric_df.corr().round(2)
-st.dataframe(corr)
+corr = numeric_df.corr()
+fig_corr = px.imshow(corr, 
+                    text_auto=True, 
+                    color_continuous_scale='RdBu_r',
+                    title="Correlation Heatmap")
+st.plotly_chart(fig_corr, use_container_width=True)
 
-# Top Customers
-st.header("Top Customers by Purchase Amount")
-top_customers = filtered_df.sort_values('PurchaseAmount', ascending=False).head(10)
-st.dataframe(top_customers)
+# Add purchase trends over age groups
+st.header("Purchase Trends by Age Group")
+# Create age bins
+filtered_df['AgeGroup'] = pd.cut(filtered_df['Age'], 
+                               bins=[18, 25, 35, 45, 55, 70], 
+                               labels=['18-25', '26-35', '36-45', '46-55', '56-70'])
+
+# Group by age group and product category
+age_product_data = filtered_df.groupby(['AgeGroup', 'ProductCategory'])['PurchaseAmount'].mean().reset_index()
+
+fig_trends = px.bar(age_product_data, 
+                   x='AgeGroup', 
+                   y='PurchaseAmount', 
+                   color='ProductCategory',
+                   barmode='group',
+                   title='Average Purchase Amount by Age Group and Product Category')
+fig_trends.update_layout(
+    xaxis_title="Age Group",
+    yaxis_title="Average Purchase Amount ($)",
+    legend_title="Product Category",
+    hovermode="closest"
+)
+st.plotly_chart(fig_trends, use_container_width=True)
+
+# Add interactive data explorer
+st.header("Interactive Data Explorer")
+x_axis = st.selectbox("Select X-axis", options=df.columns)
+y_axis = st.selectbox("Select Y-axis", options=df.columns, index=3)
+color_by = st.selectbox("Color by", options=['None'] + list(df.columns), index=5)
+
+# Create dynamic chart based on user selection
+if color_by == 'None':
+    fig_explorer = px.scatter(filtered_df, x=x_axis, y=y_axis, title=f"{y_axis} vs {x_axis}")
+else:
+    fig_explorer = px.scatter(filtered_df, x=x_axis, y=y_axis, color=color_by, 
+                            title=f"{y_axis} vs {x_axis} (colored by {color_by})")
+
+st.plotly_chart(fig_explorer, use_container_width=True)
 
 # Add footer
 st.markdown("---")
-st.markdown("Data Analysis Dashboard | Created with Streamlit")
+st.markdown("Data Analysis Dashboard | Created with Streamlit and Plotly")
