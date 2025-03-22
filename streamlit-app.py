@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import random
 
 # Page configuration
@@ -49,6 +47,9 @@ selected_city = st.sidebar.selectbox("Select City:", city_options)
 product_options = ["All", "Electronics", "Clothing", "Books", "Home", "Food"]
 product_category = st.sidebar.selectbox("Select Product Category:", product_options)
 
+# Number of rows to display
+num_rows = st.sidebar.slider("Number of rows to display", 5, 50, 20)
+
 # Apply filters
 filtered_df = df[(df['Age'] >= age_range[0]) & (df['Age'] <= age_range[1])]
 
@@ -63,80 +64,88 @@ st.write(f"Showing data for ages {age_range[0]}-{age_range[1]}, " +
          f"City: {selected_city}, Product Category: {product_category}")
 st.write(f"Filtered data contains {len(filtered_df)} records")
 
-# Create visualizations in a 2x2 grid
+# Display filtered data
+st.subheader("Filtered Data")
+st.dataframe(filtered_df.head(num_rows))
+
+# Data statistics
+st.header("Data Statistics")
 col1, col2 = st.columns(2)
 
 with col1:
-    # Age Distribution
-    st.subheader("Age Distribution")
-    fig_age, ax_age = plt.subplots(figsize=(10, 6))
-    ax_age.hist(filtered_df['Age'], bins=20, alpha=0.7)
-    ax_age.set_title('Age Distribution')
-    ax_age.set_xlabel('Age')
-    ax_age.set_ylabel('Count')
-    st.pyplot(fig_age)
+    st.subheader("Age Statistics")
+    age_stats = pd.DataFrame({
+        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation'],
+        'Value': [
+            f"{filtered_df['Age'].mean():.2f}",
+            f"{filtered_df['Age'].median():.2f}",
+            f"{filtered_df['Age'].min():.2f}",
+            f"{filtered_df['Age'].max():.2f}",
+            f"{filtered_df['Age'].std():.2f}"
+        ]
+    })
+    st.table(age_stats)
+    
+    st.subheader("Purchase Amount Statistics")
+    purchase_stats = pd.DataFrame({
+        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation', 'Total'],
+        'Value': [
+            f"${filtered_df['PurchaseAmount'].mean():.2f}",
+            f"${filtered_df['PurchaseAmount'].median():.2f}",
+            f"${filtered_df['PurchaseAmount'].min():.2f}",
+            f"${filtered_df['PurchaseAmount'].max():.2f}",
+            f"${filtered_df['PurchaseAmount'].std():.2f}",
+            f"${filtered_df['PurchaseAmount'].sum():.2f}"
+        ]
+    })
+    st.table(purchase_stats)
 
-    # City Distribution
+with col2:
+    st.subheader("Income Statistics")
+    income_stats = pd.DataFrame({
+        'Statistic': ['Mean', 'Median', 'Min', 'Max', 'Standard Deviation'],
+        'Value': [
+            f"${filtered_df['Income'].mean():.2f}",
+            f"${filtered_df['Income'].median():.2f}",
+            f"${filtered_df['Income'].min():.2f}",
+            f"${filtered_df['Income'].max():.2f}",
+            f"${filtered_df['Income'].std():.2f}"
+        ]
+    })
+    st.table(income_stats)
+    
+    # City distribution
     st.subheader("City Distribution")
     city_counts = filtered_df['City'].value_counts().reset_index()
     city_counts.columns = ['City', 'Count']
-    fig_city, ax_city = plt.subplots(figsize=(10, 6))
-    sns.barplot(x='City', y='Count', data=city_counts, ax=ax_city)
-    ax_city.set_title('City Distribution')
-    plt.xticks(rotation=45)
-    st.pyplot(fig_city)
+    st.table(city_counts)
 
-with col2:
-    # Income vs. Purchase Amount
-    st.subheader("Income vs. Purchase Amount")
-    fig_income, ax_income = plt.subplots(figsize=(10, 6))
-    scatter = ax_income.scatter(filtered_df['Income'], filtered_df['PurchaseAmount'], 
-                               c=filtered_df['City'].astype('category').cat.codes, alpha=0.6)
-    ax_income.set_title('Income vs. Purchase Amount')
-    ax_income.set_xlabel('Income')
-    ax_income.set_ylabel('Purchase Amount')
-    
-    # Add legend
-    if len(filtered_df) > 0:
-        cities = filtered_df['City'].unique()
-        handles, labels = scatter.legend_elements()
-        ax_income.legend(handles, cities, title="City")
-    
-    st.pyplot(fig_income)
+# Group data by product category
+st.header("Product Category Analysis")
+product_analysis = filtered_df.groupby('ProductCategory').agg({
+    'PurchaseAmount': ['mean', 'median', 'min', 'max', 'sum', 'count']
+}).reset_index()
 
-    # Purchase Amount by Product Category (Box Plot)
-    st.subheader("Purchase Amount by Product Category")
-    fig_box, ax_box = plt.subplots(figsize=(10, 6))
-    sns.boxplot(x='ProductCategory', y='PurchaseAmount', data=filtered_df, ax=ax_box)
-    ax_box.set_title('Purchase Amount by Product Category')
-    plt.xticks(rotation=45)
-    st.pyplot(fig_box)
+# Flatten the multi-level columns
+product_analysis.columns = ['ProductCategory', 'Mean Purchase', 'Median Purchase', 
+                           'Min Purchase', 'Max Purchase', 'Total Revenue', 'Transaction Count']
 
-# Add statistics section
-st.header("Data Statistics")
-col3, col4, col5 = st.columns(3)
+# Format currency columns
+for col in product_analysis.columns[1:6]:
+    product_analysis[col] = product_analysis[col].apply(lambda x: f"${x:.2f}")
 
-with col3:
-    st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
-    st.metric("Average Income", f"${filtered_df['Income'].mean():.2f}")
+st.dataframe(product_analysis)
 
-with col4:
-    st.metric("Average Purchase", f"${filtered_df['PurchaseAmount'].mean():.2f}")
-    st.metric("Total Purchases", f"${filtered_df['PurchaseAmount'].sum():.2f}")
-
-with col5:
-    st.metric("Highest Purchase", f"${filtered_df['PurchaseAmount'].max():.2f}")
-    st.metric("Most Common City", filtered_df['City'].value_counts().index[0] if not filtered_df.empty else "N/A")
-
-# Add correlation heatmap
+# Correlation Analysis
 st.header("Correlation Analysis")
 numeric_df = filtered_df.select_dtypes(include=['float64', 'int64'])
-corr = numeric_df.corr()
+corr = numeric_df.corr().round(2)
+st.dataframe(corr)
 
-fig_corr, ax_corr = plt.subplots(figsize=(10, 8))
-sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax_corr)
-ax_corr.set_title('Correlation Heatmap')
-st.pyplot(fig_corr)
+# Top Customers
+st.header("Top Customers by Purchase Amount")
+top_customers = filtered_df.sort_values('PurchaseAmount', ascending=False).head(10)
+st.dataframe(top_customers)
 
 # Add footer
 st.markdown("---")
