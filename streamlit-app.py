@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
 import random
 
 # Page configuration
@@ -69,28 +69,48 @@ col1, col2 = st.columns(2)
 with col1:
     # Age Distribution
     st.subheader("Age Distribution")
-    fig_age = px.histogram(filtered_df, x='Age', title='Age Distribution')
-    st.plotly_chart(fig_age, use_container_width=True)
+    fig_age, ax_age = plt.subplots(figsize=(10, 6))
+    ax_age.hist(filtered_df['Age'], bins=20, alpha=0.7)
+    ax_age.set_title('Age Distribution')
+    ax_age.set_xlabel('Age')
+    ax_age.set_ylabel('Count')
+    st.pyplot(fig_age)
 
     # City Distribution
     st.subheader("City Distribution")
     city_counts = filtered_df['City'].value_counts().reset_index()
     city_counts.columns = ['City', 'Count']
-    fig_city = px.bar(city_counts, x='City', y='Count', title='City Distribution')
-    st.plotly_chart(fig_city, use_container_width=True)
+    fig_city, ax_city = plt.subplots(figsize=(10, 6))
+    sns.barplot(x='City', y='Count', data=city_counts, ax=ax_city)
+    ax_city.set_title('City Distribution')
+    plt.xticks(rotation=45)
+    st.pyplot(fig_city)
 
 with col2:
     # Income vs. Purchase Amount
     st.subheader("Income vs. Purchase Amount")
-    fig_income_purchase = px.scatter(filtered_df, x='Income', y='PurchaseAmount', 
-                                     color='City', title='Income vs. Purchase Amount')
-    st.plotly_chart(fig_income_purchase, use_container_width=True)
+    fig_income, ax_income = plt.subplots(figsize=(10, 6))
+    scatter = ax_income.scatter(filtered_df['Income'], filtered_df['PurchaseAmount'], 
+                               c=filtered_df['City'].astype('category').cat.codes, alpha=0.6)
+    ax_income.set_title('Income vs. Purchase Amount')
+    ax_income.set_xlabel('Income')
+    ax_income.set_ylabel('Purchase Amount')
+    
+    # Add legend
+    if len(filtered_df) > 0:
+        cities = filtered_df['City'].unique()
+        handles, labels = scatter.legend_elements()
+        ax_income.legend(handles, cities, title="City")
+    
+    st.pyplot(fig_income)
 
     # Purchase Amount by Product Category (Box Plot)
     st.subheader("Purchase Amount by Product Category")
-    fig_purchase_category = px.box(filtered_df, x='ProductCategory', y='PurchaseAmount', 
-                                  title='Purchase Amount by Product Category')
-    st.plotly_chart(fig_purchase_category, use_container_width=True)
+    fig_box, ax_box = plt.subplots(figsize=(10, 6))
+    sns.boxplot(x='ProductCategory', y='PurchaseAmount', data=filtered_df, ax=ax_box)
+    ax_box.set_title('Purchase Amount by Product Category')
+    plt.xticks(rotation=45)
+    st.pyplot(fig_box)
 
 # Add statistics section
 st.header("Data Statistics")
@@ -112,8 +132,11 @@ with col5:
 st.header("Correlation Analysis")
 numeric_df = filtered_df.select_dtypes(include=['float64', 'int64'])
 corr = numeric_df.corr()
-fig_corr = px.imshow(corr, text_auto=True, aspect="auto", title="Correlation Heatmap")
-st.plotly_chart(fig_corr, use_container_width=True)
+
+fig_corr, ax_corr = plt.subplots(figsize=(10, 8))
+sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax_corr)
+ax_corr.set_title('Correlation Heatmap')
+st.pyplot(fig_corr)
 
 # Add footer
 st.markdown("---")
