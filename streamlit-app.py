@@ -1,14 +1,13 @@
 import streamlit as st
 
-# Set page config must be the first Streamlit command
+# This must be the very first Streamlit command
 st.set_page_config(page_title="Data Analysis Dashboard", layout="wide")
 
-# Import other libraries
 import pandas as pd
 import numpy as np
 import random
 
-# Create a basic Streamlit app without external dependencies
+# Title and introduction
 st.title("Interactive Data Analysis Dashboard")
 st.write("Explore customer data with interactive filters")
 
